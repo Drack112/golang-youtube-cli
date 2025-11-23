@@ -8,29 +8,23 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// CreateDetailedVideoView creates a detailed view for a single video
 func CreateDetailedVideoView(video models.SearchResult) string {
 	var content strings.Builder
 
-	// Header with title and badges
 	content.WriteString(createVideoHeader(video))
 	content.WriteString("\n\n")
 
-	// Quick info section
 	content.WriteString(createQuickInfo(video))
 	content.WriteString("\n\n")
 
-	// Metadata
 	content.WriteString(createMetadataSection(video))
 	content.WriteString("\n\n")
 
-	// Channel info
 	if video.ChannelName != "" {
 		content.WriteString(createChannelSection(video))
 		content.WriteString("\n\n")
 	}
 
-	// URL
 	content.WriteString(createURLSection(video))
 
 	return ContainerStyle.Render(content.String())
@@ -39,14 +33,12 @@ func CreateDetailedVideoView(video models.SearchResult) string {
 func createVideoHeader(video models.SearchResult) string {
 	var header strings.Builder
 
-	// Title
 	title := MainTitleStyle.
 		Width(70).
 		Render("🎬 " + TruncateText(video.Title, 66))
 	header.WriteString(title)
 	header.WriteString("\n")
 
-	// Badges
 	var badges []string
 
 	if video.IsLive {
