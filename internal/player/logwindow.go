@@ -5,6 +5,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+
+	"github.com/Drack112/go-youtube/pkg/logger"
 )
 
 func createLogFile() (*os.File, string, error) {
@@ -30,5 +32,12 @@ func openLogWindow(logPath string) error {
 		return fmt.Errorf("no supported terminal emulator found")
 	}
 
-	return cmd.Start()
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+
+	// store reference so other packages can close it
+	logger.TailCmd = cmd
+
+	return nil
 }
