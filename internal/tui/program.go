@@ -201,7 +201,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		// If input was a direct YouTube URL, open the detail view immediately
 		if m.opts != nil && m.opts.InputKind == flags.InputYoutubeURL && len(msg.results) > 0 {
-			m.selectedVideo = &msg.results[0]
+			// store results in model and select first item safely
+			m.results = msg.results
+			m.selectedVideo = &m.results[0]
 			m.state = stateDetail
 			m.viewport.SetContent(m.createDetailView())
 			return m, nil
@@ -238,11 +240,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if keyMsg, ok := msg.(tea.KeyMsg); ok {
 			switch keyMsg.String() {
 			case "enter":
-				if selected, ok := m.list.SelectedItem().(item); ok {
-					m.selectedVideo = &selected.result
-					m.state = stateDetail
-					m.viewport.SetContent(m.createDetailView())
-					return m, nil
+				if idx := m.list.Index(); idx >= 0 {
+					if idx < len(m.results) {
+						m.selectedVideo = &m.results[idx]
+						m.state = stateDetail
+						m.viewport.SetContent(m.createDetailView())
+						return m, nil
+					}
 				}
 			case "m", "M":
 				if m.hasMore && !m.isLoadingMore {
