@@ -52,7 +52,6 @@ func (i item) Description() string {
 func NewItemDelegate() list.DefaultDelegate {
 	d := list.NewDefaultDelegate()
 
-	// Customize the styles
 	d.Styles.SelectedTitle = d.Styles.SelectedTitle.
 		Foreground(lipgloss.Color("#8B5CF6")).
 		BorderForeground(lipgloss.Color("#8B5CF6"))

@@ -105,6 +105,7 @@ func (m Model) createDetailControls() string {
 
 	if m.playerType != "" {
 		controlsText = append(controlsText, fmt.Sprintf("[>]  [p/enter/space] Play with %s", m.playerType))
+		controlsText = append(controlsText, "[d]  Download video")
 	} else {
 		controlsText = append(controlsText, "[!] No video player found (install mpv)")
 	}
@@ -129,9 +130,58 @@ func (m *Model) playVideo() tea.Cmd {
 		playerType := player.PlayerType(m.playerType)
 		err := player.StreamVideo(m.selectedVideo.URL, playerType, m.opts.Quality, m.opts.WindowMode)
 		if err != nil {
-			// Return error message
 			return tea.Println(fmt.Sprintf("Failed to play video: %v", err))
 		}
 		return nil
 	}
+}
+func (m *Model) startDownloadCmd(url, container, quality string, withThumb bool) tea.Cmd {
+	return func() tea.Msg {
+		err := player.DownloadVideo(url, container, quality, withThumb)
+		return downloadResultMsg{err: err}
+	}
+}
+
+func (m Model) renderDownloadModal() string {
+	width := 48
+	lines := []string{}
+
+	if m.opts.QualityProvided {
+		lines = append(lines, "Quality (from flag): "+m.opts.Quality)
+	} else {
+		q := m.downloadQualities[m.selectedQuality]
+		if m.downloadCursor == 0 {
+			q = "> " + q
+		}
+		lines = append(lines, "Quality: "+q)
+	}
+
+	c := m.downloadContainers[m.selectedContainer]
+	if m.downloadCursor == 1 {
+		c = "> " + c
+	}
+	lines = append(lines, "Container: "+c)
+
+	thumb := "No"
+	if m.downloadWithThumb {
+		thumb = "Yes"
+	}
+	if m.downloadCursor == 2 {
+		thumb = "> " + thumb
+	}
+	lines = append(lines, "Download thumbnail: "+thumb)
+
+	// actions / status
+	if m.downloadInProgress {
+		lines = append(lines, "\nDownloading... (press Esc to cancel)")
+	} else if m.downloadMessage != "" {
+		lines = append(lines, "\n"+m.downloadMessage)
+		lines = append(lines, "Press Enter/Esc to close")
+	} else {
+		lines = append(lines, "\nPress Enter to start download | Esc to cancel")
+	}
+
+	content := lipgloss.JoinVertical(lipgloss.Left, lines...)
+	box := lipgloss.NewStyle().Width(width).Padding(1, 2).Border(lipgloss.RoundedBorder()).Render(content)
+	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, box)
 }

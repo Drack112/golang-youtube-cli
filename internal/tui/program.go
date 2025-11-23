@@ -41,6 +41,16 @@ type Model struct {
 
 	width  int
 	height int
+
+	showDownload       bool
+	downloadCursor     int
+	downloadQualities  []string
+	downloadContainers []string
+	selectedQuality    int
+	selectedContainer  int
+	downloadWithThumb  bool
+	downloadInProgress bool
+	downloadMessage    string
 }
 
 type searchResultsMsg struct {
@@ -49,6 +59,10 @@ type searchResultsMsg struct {
 	hasMore           bool
 	err               error
 	isLoadMore        bool
+}
+
+type downloadResultMsg struct {
+	err error
 }
 
 func NewModel(opts *flags.Options) Model {
@@ -62,7 +76,6 @@ func NewModel(opts *flags.Options) Model {
 	s.Spinner = spinner.Dot
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#8B5CF6"))
 
-	// Initialize list with custom delegate
 	delegate := NewItemDelegate()
 	l := list.New([]list.Item{}, delegate, 0, 0)
 	l.Title = "[?] Search Results"
@@ -71,7 +84,6 @@ func NewModel(opts *flags.Options) Model {
 		Bold(true).
 		Padding(0, 1)
 
-	// Add help text
 	l.AdditionalShortHelpKeys = func() []key.Binding {
 		return []key.Binding{
 			key.NewBinding(
@@ -98,11 +110,13 @@ func NewModel(opts *flags.Options) Model {
 	}
 
 	return Model{
-		state:      stateLoading,
-		opts:       opts,
-		spinner:    s,
-		list:       l,
-		playerType: playerTypeStr,
+		state:              stateLoading,
+		opts:               opts,
+		spinner:            s,
+		list:               l,
+		playerType:         playerTypeStr,
+		downloadQualities:  []string{"best", "1080p", "720p", "480p", "360p", "audio"},
+		downloadContainers: []string{"mp4", "mkv", "webm"},
 	}
 }
 
@@ -124,6 +138,21 @@ func (m Model) Init() tea.Cmd {
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+
+	switch d := msg.(type) {
+	case downloadResultMsg:
+		// clear console to remove any stray log output and close modal
+		fmt.Print("\033[H\033[2J")
+		m.downloadInProgress = false
+		m.downloadMessage = ""
+		m.showDownload = false
+		if d.err != nil {
+			// optionally write a short message in the list area (could be expanded)
+			m.err = fmt.Errorf("download failed: %w", d.err)
+			m.state = stateError
+		}
+		return m, nil
+	}
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
@@ -135,9 +164,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c":
+			// prevent quitting while a download is in progress inside the modal
+			if m.showDownload && m.downloadInProgress {
+				return m, nil
+			}
+			_ = player.StopCurrentPlayer()
 			return m, tea.Quit
 		case "q":
+			// prevent quitting while a download is in progress inside the modal
+			if m.showDownload && m.downloadInProgress {
+				return m, nil
+			}
 			if m.state == stateList || m.state == stateError {
+				_ = player.StopCurrentPlayer()
 				return m, tea.Quit
 			}
 		case "esc":
@@ -147,6 +186,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.selectedVideo = nil
 				return m, nil
 			case stateError:
+				_ = player.StopCurrentPlayer()
 				return m, tea.Quit
 			}
 		}
@@ -156,6 +196,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.err != nil {
 			m.state = stateError
 			m.err = msg.err
+			return m, nil
+		}
+
+		// If input was a direct YouTube URL, open the detail view immediately
+		if m.opts != nil && m.opts.InputKind == flags.InputYoutubeURL && len(msg.results) > 0 {
+			m.selectedVideo = &msg.results[0]
+			m.state = stateDetail
+			m.viewport.SetContent(m.createDetailView())
 			return m, nil
 		}
 
@@ -205,6 +253,87 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.list, cmd = m.list.Update(msg)
 	case stateDetail:
+		if m.showDownload {
+			// handle download modal keys
+			if keyMsg, ok := msg.(tea.KeyMsg); ok {
+				// while download is in progress, ignore all keys (no cancel/no change)
+				if m.downloadInProgress {
+					return m, nil
+				}
+
+				// if download finished message is shown, any Enter or Esc will close modal
+				if m.downloadMessage != "" {
+					switch keyMsg.String() {
+					case "enter", "esc":
+						m.showDownload = false
+						m.downloadMessage = ""
+						m.downloadInProgress = false
+						return m, nil
+					}
+				}
+
+				switch keyMsg.String() {
+				case "esc":
+					m.showDownload = false
+					m.downloadInProgress = false
+					m.downloadMessage = ""
+					return m, nil
+				case "up", "k":
+					if m.downloadCursor > 0 {
+						m.downloadCursor--
+					}
+					return m, nil
+				case "down", "j":
+					if m.downloadCursor < 3 {
+						m.downloadCursor++
+					}
+					return m, nil
+				case "left", "h":
+					switch m.downloadCursor {
+					case 0:
+						if m.selectedQuality > 0 {
+							m.selectedQuality--
+						}
+					case 1:
+						if m.selectedContainer > 0 {
+							m.selectedContainer--
+						}
+					case 2:
+						m.downloadWithThumb = !m.downloadWithThumb
+					}
+					return m, nil
+				case "right", "l":
+					switch m.downloadCursor {
+					case 0:
+						if m.selectedQuality < len(m.downloadQualities)-1 {
+							m.selectedQuality++
+						}
+					case 1:
+						if m.selectedContainer < len(m.downloadContainers)-1 {
+							m.selectedContainer++
+						}
+					case 2:
+						m.downloadWithThumb = !m.downloadWithThumb
+					}
+					return m, nil
+				case "enter":
+					if !m.downloadInProgress {
+						// start download
+						m.downloadInProgress = true
+						quality := m.downloadQualities[m.selectedQuality]
+						container := m.downloadContainers[m.selectedContainer]
+						// if flag provided for quality, respect it and only use flag value
+						if m.opts.QualityProvided {
+							quality = m.opts.Quality
+						}
+						return m, m.startDownloadCmd(m.selectedVideo.URL, container, quality, m.downloadWithThumb)
+					}
+					return m, nil
+				}
+			}
+			return m, nil
+		}
+
 		if keyMsg, ok := msg.(tea.KeyMsg); ok {
 			switch keyMsg.String() {
 			case "p", "P", "enter", " ":
@@ -214,6 +343,30 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						m.playVideo(),
 						tea.EnterAltScreen,
 					)
+				}
+			case "d", "D":
+				if m.selectedVideo != nil {
+					// open download modal
+					m.showDownload = true
+					// initialize selections
+					// set quality index to match opts.Quality if present
+					m.selectedQuality = 0
+					for i, q := range m.downloadQualities {
+						if q == m.opts.Quality {
+							m.selectedQuality = i
+							break
+						}
+					}
+					m.selectedContainer = 0
+					for i, c := range m.downloadContainers {
+						if c == "mp4" {
+							m.selectedContainer = i
+							break
+						}
+					}
+					m.downloadWithThumb = false
+					m.downloadCursor = 0
+					return m, nil
 				}
 			}
 		}
@@ -230,6 +383,9 @@ func (m Model) View() string {
 	case stateList:
 		return m.listView()
 	case stateDetail:
+		if m.showDownload {
+			return m.renderDownloadModal()
+		}
 		return m.detailView()
 	case stateError:
 		return m.errorView()

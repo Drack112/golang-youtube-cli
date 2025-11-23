@@ -62,6 +62,3 @@ func TruncateText(text string, maxLength int) string {
 	return text[:maxLength-3] + "..."
 }
 
-func CreateBadge(text string, style lipgloss.Style) string {
-	return style.Render(text)
-}
