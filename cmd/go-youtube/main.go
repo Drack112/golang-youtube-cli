@@ -2,26 +2,20 @@ package main
 
 import (
 	"fmt"
-	"log"
 
 	"github.com/Drack112/go-youtube/internal/flags"
+	"github.com/Drack112/go-youtube/internal/handlers"
+	"github.com/Drack112/go-youtube/pkg/logger"
 )
 
 func main() {
-	options, err := flags.ParseFlags()
+	value, err := flags.ParseFlags()
 	if err != nil {
-		if err == flags.ErrDownloadRequested {
-			// Handle After
-			return
-		}
-
 		if err == flags.ErrHelpRequested {
 			return
 		}
-
-		log.Fatalln(flags.ErrorHandler(err))
+		logger.Fatal(flags.ErrorHandler(err))
 	}
 
-	fmt.Println(options)
-
+	fmt.Println(handlers.SearchWithRetries(value))
 }
