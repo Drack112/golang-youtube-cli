@@ -16,7 +16,21 @@ const youtubeSearchBase = "https://www.youtube.com/results?search_query="
 
 var initialDataRegex = regexp.MustCompile(`var ytInitialData = (\{.*?\});`)
 
+type SearchResponse struct {
+	Results           []models.SearchResult
+	ContinuationToken string
+	HasMore           bool
+}
+
 func SearchVideos(input string) ([]models.SearchResult, error) {
+	resp, err := SearchVideosWithPagination(input, "")
+	if err != nil {
+		return nil, err
+	}
+	return resp.Results, nil
+}
+
+func SearchVideosWithPagination(input string, continuationToken string) (*SearchResponse, error) {
 	input = strings.TrimSpace(input)
 	if input == "" {
 		return nil, nil
@@ -25,49 +39,60 @@ func SearchVideos(input string) ([]models.SearchResult, error) {
 	logger.Debug("[SearchVideos] raw input ", "input", input)
 
 	if utils.IsYouTubeURL(input) {
-		logger.Debug("[SearchVideos] detected YouTube URL", "input", input)
+		logger.Debug("[SearchVideosWithPagination] detected YouTube URL", "input", input)
 
 		clean := utils.CleanYoutubeLink(input)
 		id := utils.ExtractVideoID(clean)
 
 		if id == "" {
-			logger.Error("[SearchVideos] failed to extract Id from ", "clean", clean)
+			logger.Error("[SearchVideosWithPagination] failed to extract Id from ", "clean", clean)
 			return nil, errors.New("invalid YouTube link")
 		}
 
-		return []models.SearchResult{
-			{
-				ID:          id,
-				Title:       "(Fetching metadata...)",
-				URL:         "https://www.youtube.com/watch?v=" + id,
-				Thumbnail:   "https://i.ytimg.com/vi/" + id + "/hqdefault.jpg",
-				Duration:    "",
-				DurationSec: 0,
+		return &SearchResponse{
+			Results: []models.SearchResult{
+				{
+					ID:          id,
+					Title:       "(Fetching metadata...)",
+					URL:         "https://www.youtube.com/watch?v=" + id,
+					Thumbnail:   "https://i.ytimg.com/vi/" + id + "/hqdefault.jpg",
+					Duration:    "",
+					DurationSec: 0,
+				},
 			},
+			ContinuationToken: "",
+			HasMore:           false,
 		}, nil
 	}
 
-	logger.Debug("[SearchVideos] performing search for ", "input", input)
+	logger.Debug("[SearchVideosWithPagination] performing search for ", "input", input)
 
+	// For now, we'll just do the initial search
+	// Continuation token support would require YouTube API key or more complex scraping
 	url := youtubeSearchBase + utils.URLEncode(input)
 	body, err := utils.Fetch(url)
 	if err != nil {
-		logger.Error("[SearchVideos] fetch failed", "error", err)
+		logger.Error("[SearchVideosWithPagination] fetch failed", "error", err)
 		return nil, err
 	}
 
 	jsonData, err := extractInitialData(body)
 	if err != nil {
-		logger.Error("[SearchVideos] failed to extract ytInitialData", "error", err)
+		logger.Error("[SearchVideosWithPagination] failed to extract ytInitialData", "error", err)
+		return nil, err
 	}
 
-	results, err := parseSearchResults(jsonData)
+	results, continuation, err := parseSearchResultsWithContinuation(jsonData)
 	if err != nil {
-		logger.Error("[SearchVideos] failed to extract ytInitialData", "error", err)
+		logger.Error("[SearchVideosWithPagination] failed to parse results", "error", err)
 		return nil, fmt.Errorf("extract error: %w", err)
 	}
 
-	return results, nil
+	return &SearchResponse{
+		Results:           results,
+		ContinuationToken: continuation,
+		HasMore:           continuation != "",
+	}, nil
 }
 
 func extractInitialData(html string) ([]byte, error) {
@@ -80,9 +105,14 @@ func extractInitialData(html string) ([]byte, error) {
 }
 
 func parseSearchResults(jsonData []byte) ([]models.SearchResult, error) {
+	results, _, err := parseSearchResultsWithContinuation(jsonData)
+	return results, err
+}
+
+func parseSearchResultsWithContinuation(jsonData []byte) ([]models.SearchResult, string, error) {
 	var root map[string]any
 	if err := json.Unmarshal(jsonData, &root); err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	contents := utils.DeepGet(
@@ -95,10 +125,32 @@ func parseSearchResults(jsonData []byte) ([]models.SearchResult, error) {
 	)
 
 	if contents == nil {
-		return nil, errors.New("search results missing")
+		return nil, "", errors.New("search results missing")
 	}
 
-	return extractVideoRenderers(contents)
+	results, err := extractVideoRenderers(contents)
+	if err != nil {
+		return nil, "", err
+	}
+
+	continuation := ""
+	if arr, ok := contents.([]any); ok {
+		for _, block := range arr {
+			if blockMap, ok := block.(map[string]any); ok {
+				if contItem := blockMap["continuationItemRenderer"]; contItem != nil {
+					if contItemMap, ok := contItem.(map[string]any); ok {
+						if token := utils.DeepGet(contItemMap, "continuationEndpoint", "continuationCommand", "token"); token != nil {
+							if tokenStr, ok := token.(string); ok {
+								continuation = tokenStr
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return results, continuation, nil
 }
 
 func extractVideoRenderers(contents any) ([]models.SearchResult, error) {
