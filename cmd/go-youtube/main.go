@@ -20,7 +20,6 @@ func main() {
 		}
 	}
 
-	// For interactive TUI
 	model := tui.NewModel(opts)
 	if err := tui.NewProgram(model).Start(); err != nil {
 		fmt.Printf("Error: %v\n", err)

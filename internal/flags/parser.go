@@ -30,8 +30,9 @@ type Options struct {
 	Quality    string
 	WindowMode string
 
-	Input     string
-	InputKind InputSrc
+	Input           string
+	InputKind       InputSrc
+	QualityProvided bool
 }
 
 func ErrorHandler(err error) string {
@@ -84,6 +85,11 @@ func ParseFlags() (*Options, error) {
 
 	opts.Debug = *debug
 	opts.Quality = *quality
+	flag.Visit(func(f *flag.Flag) {
+		if f.Name == "quality" {
+			opts.QualityProvided = true
+		}
+	})
 	opts.WindowMode = *windowMode
 	IsDebug = opts.Debug
 

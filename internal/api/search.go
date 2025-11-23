@@ -5,9 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/Drack112/go-youtube/internal/models"
+
 	"github.com/Drack112/go-youtube/pkg/logger"
 	"github.com/Drack112/go-youtube/pkg/utils"
 )
@@ -49,17 +51,101 @@ func SearchVideosWithPagination(input string, continuationToken string) (*Search
 			return nil, errors.New("invalid YouTube link")
 		}
 
-		return &SearchResponse{
-			Results: []models.SearchResult{
-				{
+		// Try to fetch the watch page and extract initialPlayerResponse for richer metadata
+		watchURL := "https://www.youtube.com/watch?v=" + id
+		body, err := utils.Fetch(watchURL)
+		if err != nil {
+			logger.Warn("[SearchVideosWithPagination] failed to fetch watch page, falling back to basic data", "error", err)
+			return &SearchResponse{
+				Results: []models.SearchResult{{
 					ID:          id,
 					Title:       "(Fetching metadata...)",
-					URL:         "https://www.youtube.com/watch?v=" + id,
+					URL:         watchURL,
 					Thumbnail:   "https://i.ytimg.com/vi/" + id + "/hqdefault.jpg",
 					Duration:    "",
 					DurationSec: 0,
-				},
-			},
+				}},
+				ContinuationToken: "",
+				HasMore:           false,
+			}, nil
+		}
+
+		// look for ytInitialPlayerResponse object
+		playerRegex := regexp.MustCompile(`ytInitialPlayerResponse\s*=\s*(\{.*?\});`)
+		match := playerRegex.FindStringSubmatch(body)
+		if len(match) < 2 {
+			// fallback to basic
+			logger.Warn("[SearchVideosWithPagination] initialPlayerResponse not found, using fallback")
+			return &SearchResponse{
+				Results: []models.SearchResult{{
+					ID:          id,
+					Title:       "(Fetching metadata...)",
+					URL:         watchURL,
+					Thumbnail:   "https://i.ytimg.com/vi/" + id + "/hqdefault.jpg",
+					Duration:    "",
+					DurationSec: 0,
+				}},
+				ContinuationToken: "",
+				HasMore:           false,
+			}, nil
+		}
+
+		var resp map[string]any
+		if err := json.Unmarshal([]byte(match[1]), &resp); err != nil {
+			logger.Warn("[SearchVideosWithPagination] failed to unmarshal player response", "error", err)
+			return &SearchResponse{
+				Results: []models.SearchResult{{
+					ID:          id,
+					Title:       "(Fetching metadata...)",
+					URL:         watchURL,
+					Thumbnail:   "https://i.ytimg.com/vi/" + id + "/hqdefault.jpg",
+					Duration:    "",
+					DurationSec: 0,
+				}},
+				ContinuationToken: "",
+				HasMore:           false,
+			}, nil
+		}
+
+		videoDetails := utils.DeepGet(resp, "videoDetails")
+		title := ""
+		author := ""
+		lengthSec := 0
+		isLive := false
+		channelID := ""
+
+		if vd, ok := videoDetails.(map[string]any); ok {
+			title = utils.Str(vd["title"])
+			author = utils.Str(vd["author"])
+			if ls := utils.Str(vd["lengthSeconds"]); ls != "" {
+				if n, err := strconv.Atoi(ls); err == nil {
+					lengthSec = n
+				}
+			}
+			if idv := utils.Str(vd["videoId"]); idv != "" {
+				// ensure URL uses normalized id
+				id = idv
+			}
+			if cid := utils.Str(vd["channelId"]); cid != "" {
+				channelID = cid
+			}
+			if isLiveVal, ok := vd["isLiveContent"].(bool); ok {
+				isLive = isLiveVal
+			}
+		}
+
+		return &SearchResponse{
+			Results: []models.SearchResult{{
+				ID:          id,
+				Title:       title,
+				URL:         "https://www.youtube.com/watch?v=" + id,
+				Thumbnail:   "https://i.ytimg.com/vi/" + id + "/hqdefault.jpg",
+				Duration:    "",
+				DurationSec: lengthSec,
+				ChannelName: author,
+				ChannelID:   channelID,
+				IsLive:      isLive,
+			}},
 			ContinuationToken: "",
 			HasMore:           false,
 		}, nil
@@ -67,9 +153,7 @@ func SearchVideosWithPagination(input string, continuationToken string) (*Search
 
 	logger.Debug("[SearchVideosWithPagination] performing search for ", "input", input)
 
-	// For now, we'll just do the initial search
-	// Continuation token support would require YouTube API key or more complex scraping
-	url := youtubeSearchBase + utils.URLEncode(input)
+	url := "https://www.youtube.com/results?search_query=" + utils.URLEncode(input)
 	body, err := utils.Fetch(url)
 	if err != nil {
 		logger.Error("[SearchVideosWithPagination] fetch failed", "error", err)
@@ -254,7 +338,6 @@ func parseVideoRenderer(m map[string]any) *models.SearchResult {
 		dur = utils.GetText(m, "lengthText", "runs", "text")
 	}
 
-	// Extract channel info
 	channelID := ""
 	channelURL := ""
 	if ownerBrowseEndpoint := utils.DeepGet(m, "ownerText", "runs", "navigationEndpoint", "browseEndpoint"); ownerBrowseEndpoint != nil {
