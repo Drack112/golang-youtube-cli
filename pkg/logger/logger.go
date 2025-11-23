@@ -20,7 +20,7 @@ func getColoredPrefix() string {
 		Padding(0, 1).
 		MarginRight(1)
 
-	return style.Render(" GO-Youtube")
+	return style.Render("GO-Youtube")
 }
 
 func InitLogger(isDebug bool) {
