@@ -12,12 +12,9 @@ import (
 )
 
 var (
-	IsDebug              bool
-	ErrHelpRequested     = errors.New("help requested")
-	ErrDownloadRequested = errors.New("download requested")
-	ErrNoInput           = errors.New("no input provided")
-
-	GlobalQuality string
+	IsDebug          bool
+	ErrHelpRequested = errors.New("help requested")
+	ErrNoInput       = errors.New("no input provided")
 )
 
 type InputSrc int
@@ -29,9 +26,9 @@ const (
 )
 
 type Options struct {
-	Debug    bool
-	Download bool
-	Quality  string
+	Debug      bool
+	Quality    string
+	WindowMode string
 
 	Input     string
 	InputKind InputSrc
@@ -69,18 +66,16 @@ func ParseFlags() (*Options, error) {
 	opts := &Options{}
 
 	debug := flag.Bool("debug", false, "enable debug mode")
-	download := flag.Bool("download", false, "download instead of stream")
-	quality := flag.String("quality", "best", "video quality (best, worst, 720p, 1080p)")
-
 	help := flag.Bool("help", false, "show help message")
 	versionFlag := flag.Bool("version", false, "show version information")
+	quality := flag.String("quality", "best", "video quality (best, 1080p, 720p, 480p, 360p, audio)")
+	windowMode := flag.String("window", "windowed", "window mode (windowed, fullscreen, borderless, maximized)")
 
 	flag.Usage = func() {
 		fmt.Println("\ngo-youtube [OPTIONS] <url | search term>")
 		fmt.Println("Examples:")
 		fmt.Println("  go-youtube \"lofi chill\"")
-		fmt.Println("  go-youtube https://youtu.be/xxx")
-		fmt.Println("  go-youtube -download \"metallica live\"")
+		fmt.Println("  go-youtube -quality 720p -window fullscreen https://youtu.be/xxx")
 		fmt.Println("\nOptions:")
 		flag.PrintDefaults()
 	}
@@ -88,11 +83,9 @@ func ParseFlags() (*Options, error) {
 	flag.Parse()
 
 	opts.Debug = *debug
-	opts.Download = *download
 	opts.Quality = *quality
-
+	opts.WindowMode = *windowMode
 	IsDebug = opts.Debug
-	GlobalQuality = opts.Quality
 
 	if opts.Debug {
 		logger.InitLogger(opts.Debug)
@@ -133,10 +126,6 @@ func ParseFlags() (*Options, error) {
 		opts.InputKind = InputYoutubeURL
 	} else {
 		opts.InputKind = InputSearchQuery
-	}
-
-	if opts.Download {
-		return opts, ErrDownloadRequested
 	}
 
 	return opts, nil
