@@ -173,7 +173,8 @@ func (m Model) renderDownloadModal() string {
 
 	// actions / status
 	if m.downloadInProgress {
-		lines = append(lines, "\nDownloading... (press Esc to cancel)")
+		lines = append(lines, "\nDownloading...")
+		lines = append(lines, " "+m.spinner.View())
 	} else if m.downloadMessage != "" {
 		lines = append(lines, "\n"+m.downloadMessage)
 		lines = append(lines, "Press Enter/Esc to close")

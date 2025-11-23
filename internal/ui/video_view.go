@@ -35,7 +35,7 @@ func createVideoHeader(video models.SearchResult) string {
 
 	title := MainTitleStyle.
 		Width(70).
-		Render("🎬 " + TruncateText(video.Title, 66))
+		Render(TruncateText(video.Title, 66))
 	header.WriteString(title)
 	header.WriteString("\n")
 

@@ -254,14 +254,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.list, cmd = m.list.Update(msg)
 	case stateDetail:
 		if m.showDownload {
-			// handle download modal keys
 			if keyMsg, ok := msg.(tea.KeyMsg); ok {
-				// while download is in progress, ignore all keys (no cancel/no change)
 				if m.downloadInProgress {
-					return m, nil
+					var innerCmd tea.Cmd
+					m.spinner, innerCmd = m.spinner.Update(msg)
+					return m, innerCmd
 				}
 
-				// if download finished message is shown, any Enter or Esc will close modal
 				if m.downloadMessage != "" {
 					switch keyMsg.String() {
 					case "enter", "esc":
@@ -326,7 +325,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						if m.opts.QualityProvided {
 							quality = m.opts.Quality
 						}
-						return m, m.startDownloadCmd(m.selectedVideo.URL, container, quality, m.downloadWithThumb)
+						return m, tea.Batch(m.startDownloadCmd(m.selectedVideo.URL, container, quality, m.downloadWithThumb), m.spinner.Tick)
 					}
 					return m, nil
 				}
