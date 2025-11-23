@@ -97,7 +97,6 @@ func buildMPVCommandWithOptions(videoURL string, quality string, windowMode stri
 
 		userAgent := "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 		args = append(args, "--user-agent="+userAgent)
-		args = append(args, "--script-opts-append=ytdl_hook-ytdl_raw_options=user-agent="+userAgent)
 
 		ytdlFormat := convertQualityToFormat(quality)
 		args = append(args, fmt.Sprintf("--ytdl-format=%s", ytdlFormat))
