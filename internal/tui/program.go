@@ -193,11 +193,32 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
+		// Deduplicate the data of the youtube after trigger the "Load More" option
 		if msg.isLoadMore {
-			m.results = append(m.results, msg.results...)
+			seen := make(map[string]bool, len(m.results)+len(msg.results))
+			for _, r := range m.results {
+				seen[r.ID] = true
+			}
+
+			var toAdd []models.SearchResult
+			for _, r := range msg.results {
+				if r.ID == "" {
+					toAdd = append(toAdd, r)
+					continue
+				}
+				if !seen[r.ID] {
+					toAdd = append(toAdd, r)
+					seen[r.ID] = true
+				}
+			}
+
+			if len(toAdd) > 0 {
+				m.results = append(m.results, toAdd...)
+			}
 		} else {
 			m.results = msg.results
 		}
+	
 
 		m.continuationToken = msg.continuationToken
 		m.hasMore = msg.hasMore
