@@ -30,7 +30,7 @@ func (m *Model) loadMoreResults() tea.Cmd {
 	return func() tea.Msg {
 		resp, err := api.SearchVideosWithPagination(m.opts.Input, m.continuationToken)
 		if err != nil {
-			return searchResultsMsg{err: err, isLoadMore: true}
+			return searchResultsMsg{err: err}
 		}
 		return searchResultsMsg{
 			results:           resp.Results,
@@ -47,10 +47,7 @@ func (m Model) loadingView() string {
 		m.width, m.height,
 		lipgloss.Center, lipgloss.Center,
 		lipgloss.JoinVertical(
-			lipgloss.Center,
-			m.spinner.View(),
-			"Searching for: "+m.opts.Input,
-			"\n\nPress q to quit",
+			lipgloss.Center, m.spinner.View(), "Searching for: "+m.opts.Input, "\n\nPress q to quit",
 		),
 	)
 }
@@ -73,14 +70,6 @@ func (m Model) detailView() string {
 			"\n",
 			m.createDetailControls(),
 		),
-	)
-}
-
-func (m Model) errorView() string {
-	return lipgloss.Place(
-		m.width, m.height,
-		lipgloss.Center, lipgloss.Center,
-		ui.CreateErrorBox("Search Error", m.err.Error()),
 	)
 }
 

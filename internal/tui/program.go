@@ -79,12 +79,9 @@ func NewModel(opts *flags.Options) Model {
 	delegate := NewItemDelegate()
 	l := list.New([]list.Item{}, delegate, 0, 0)
 	l.Title = "[?] Search Results"
-	l.Styles.Title = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#8B5CF6")).
-		Bold(true).
-		Padding(0, 1)
+	l.Styles.Title = lipgloss.NewStyle().Foreground(lipgloss.Color("#8B5CF6")).Bold(true).Padding(0, 1)
 
-	l.AdditionalShortHelpKeys = func() []key.Binding {
+	helpKeys := func() []key.Binding {
 		return []key.Binding{
 			key.NewBinding(
 				key.WithKeys("enter"),
@@ -96,18 +93,9 @@ func NewModel(opts *flags.Options) Model {
 			),
 		}
 	}
-	l.AdditionalFullHelpKeys = func() []key.Binding {
-		return []key.Binding{
-			key.NewBinding(
-				key.WithKeys("enter"),
-				key.WithHelp("enter", "view details"),
-			),
-			key.NewBinding(
-				key.WithKeys("m"),
-				key.WithHelp("m", "load more results"),
-			),
-		}
-	}
+
+	l.AdditionalShortHelpKeys = helpKeys
+	l.AdditionalFullHelpKeys = helpKeys
 
 	return Model{
 		state:              stateLoading,
@@ -120,25 +108,21 @@ func NewModel(opts *flags.Options) Model {
 	}
 }
 
+// Main loader
 func NewProgram(model Model) *tea.Program {
 	return tea.NewProgram(model, tea.WithAltScreen())
 }
 
+// Methods for tea.Program
 func (m Model) Init() tea.Cmd {
 	if m.opts.InputKind == flags.InputYoutubeURL {
-		return tea.Batch(
-			m.spinner.Tick,
-			m.fetchVideoDetails(),
-		)
+		return tea.Batch(m.spinner.Tick, m.fetchVideoDetails())
 	}
-	return tea.Batch(
-		m.spinner.Tick,
-		m.performSearch(),
-	)
+
+	return tea.Batch(m.spinner.Tick, m.performSearch())
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-
 	switch d := msg.(type) {
 	case downloadResultMsg:
 		// clear console to remove any stray log output and close modal
@@ -390,8 +374,6 @@ func (m Model) View() string {
 			return m.renderDownloadModal()
 		}
 		return m.detailView()
-	case stateError:
-		return m.errorView()
 	default:
 		return "Unknown state"
 	}

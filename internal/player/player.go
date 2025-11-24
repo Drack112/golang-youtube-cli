@@ -43,18 +43,6 @@ func StreamVideo(videoURL string, playerType PlayerType, quality string, windowM
 	var logFile *os.File
 	if logger.LogFile != nil {
 		logFile = logger.LogFile
-	} else {
-		lf, logPath, err := createLogFile()
-		if err != nil {
-			logger.Warn("[Player] Failed to create log file", "error", err)
-		} else {
-			defer lf.Close()
-			logFile = lf
-
-			if err := openLogWindow(logPath); err != nil {
-				logger.Warn("[Player] Failed to open log window", "error", err)
-			}
-		}
 	}
 
 	cmd := buildMPVCommandWithOptions(videoURL, quality, windowMode)
