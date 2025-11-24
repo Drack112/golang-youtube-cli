@@ -5,7 +5,7 @@ import (
 	"os"
 )
 
-var Version = "v0.1.0"
+var Version = "v0.2.0"
 
 func HasVersionArg() bool {
 	if len(os.Args) > 1 {
@@ -17,5 +17,5 @@ func HasVersionArg() bool {
 }
 
 func ShowVersion() {
-	fmt.Printf("GO-Youtube v%s", Version)
+	fmt.Printf("GO-YouTube %s", Version)
 }
