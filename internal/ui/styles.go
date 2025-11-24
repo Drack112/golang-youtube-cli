@@ -1,8 +1,6 @@
 package ui
 
 import (
-	"fmt"
-
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -41,24 +39,3 @@ var (
 	MetadataStyle  = lipgloss.NewStyle().Foreground(TextMuted).Italic(true)
 	SeparatorStyle = lipgloss.NewStyle().Foreground(Surface)
 )
-
-func FormatDuration(seconds int) string {
-	if seconds == 0 {
-		return "LIVE"
-	}
-	hours := seconds / 3600
-	minutes := (seconds % 3600) / 60
-	secs := seconds % 60
-	if hours > 0 {
-		return fmt.Sprintf("%02d:%02d:%02d", hours, minutes, secs)
-	}
-	return fmt.Sprintf("%02d:%02d", minutes, secs)
-}
-
-func TruncateText(text string, maxLength int) string {
-	if len(text) <= maxLength {
-		return text
-	}
-	return text[:maxLength-3] + "..."
-}
-

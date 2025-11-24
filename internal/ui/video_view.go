@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/Drack112/go-youtube/internal/models"
+	"github.com/Drack112/go-youtube/pkg/utils"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -35,7 +36,7 @@ func createVideoHeader(video models.SearchResult) string {
 
 	title := MainTitleStyle.
 		Width(70).
-		Render(TruncateText(video.Title, 66))
+		Render(utils.TruncateText(video.Title, 66))
 	header.WriteString(title)
 	header.WriteString("\n")
 
@@ -48,7 +49,7 @@ func createVideoHeader(video models.SearchResult) string {
 		badges = append(badges, ShortBadgeStyle.Render("SHORT"))
 	}
 	if video.Duration != "" && !video.IsLive {
-		durationText := FormatDuration(video.DurationSec)
+		durationText := utils.FormatDuration(video.DurationSec)
 		badges = append(badges, DurationBadgeStyle.Render(durationText))
 	}
 
@@ -72,7 +73,7 @@ func createQuickInfo(video models.SearchResult) string {
 
 	if !video.IsLive && !video.IsShort {
 		info.WriteString(NormalTextStyle.Render("  Duration: "))
-		info.WriteString(SuccessTextStyle.Render(FormatDuration(video.DurationSec)))
+		info.WriteString(SuccessTextStyle.Render(utils.FormatDuration(video.DurationSec)))
 		info.WriteString("\n")
 	}
 
@@ -96,7 +97,7 @@ func createMetadataSection(video models.SearchResult) string {
 
 	if video.DurationSec > 0 && !video.IsLive {
 		metadata.WriteString(NormalTextStyle.Render("  Length: "))
-		metadata.WriteString(SuccessTextStyle.Render(FormatDuration(video.DurationSec)))
+		metadata.WriteString(SuccessTextStyle.Render(utils.FormatDuration(video.DurationSec)))
 		metadata.WriteString(MutedTextStyle.Render(" (" + strconv.Itoa(video.DurationSec) + " seconds)"))
 		metadata.WriteString("\n")
 	}

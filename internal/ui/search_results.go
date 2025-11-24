@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/Drack112/go-youtube/internal/models"
+	"github.com/Drack112/go-youtube/pkg/utils"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -34,7 +35,7 @@ func createResultItem(result models.SearchResult, index int) string {
 
 	item.WriteString(indexStyle.Render(fmt.Sprintf("%d.", index)))
 	item.WriteString(" ")
-	item.WriteString(titleStyle.Render(TruncateText(result.Title, 58)))
+	item.WriteString(titleStyle.Render(utils.TruncateText(result.Title, 58)))
 
 	var metaParts []string
 
@@ -47,11 +48,11 @@ func createResultItem(result models.SearchResult, index int) string {
 	}
 
 	if result.Duration != "" && !result.IsLive {
-		metaParts = append(metaParts, DurationBadgeStyle.Render(FormatDuration(result.DurationSec)))
+		metaParts = append(metaParts, DurationBadgeStyle.Render(utils.FormatDuration(result.DurationSec)))
 	}
 
 	if result.ChannelName != "" {
-		channelText := ChannelBadgeStyle.Render(TruncateText(result.ChannelName, 20))
+		channelText := ChannelBadgeStyle.Render(utils.TruncateText(result.ChannelName, 20))
 		metaParts = append(metaParts, channelText)
 	}
 
@@ -62,7 +63,7 @@ func createResultItem(result models.SearchResult, index int) string {
 	}
 
 	urlStyle := MutedTextStyle.Copy().Italic(true).MarginLeft(4)
-	item.WriteString(urlStyle.Render(TruncateText(result.URL, 63)))
+	item.WriteString(urlStyle.Render(utils.TruncateText(result.URL, 63)))
 
 	return item.String()
 }
